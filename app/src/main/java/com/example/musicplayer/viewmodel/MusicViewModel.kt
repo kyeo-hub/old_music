@@ -5,13 +5,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.SharedPreferences
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import androidx.room.Room
 import com.example.musicplayer.data.Album
-import com.example.musicplayer.data.MusicDatabase
 import com.example.musicplayer.data.MusicSourceConfig
 import com.example.musicplayer.data.MusicSourceType
 import com.example.musicplayer.data.PlayerState
@@ -33,7 +32,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private var musicService: MusicService? = null
     private var isServiceBound = false
-    private lateinit var database: MusicDatabase
+    
+    private val sharedPrefs: SharedPreferences = application.getSharedPreferences(
+        "music_player_prefs", Context.MODE_PRIVATE
+    )
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
@@ -53,11 +55,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        database = Room.databaseBuilder(
-            application,
-            MusicDatabase::class.java, "music-db"
-        ).build()
-        
         loadMusicSources()
         bindService()
     }
@@ -70,7 +67,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadMusicSources() {
         viewModelScope.launch {
-            val sources = database.musicSourceDao().getAllSources()
+            val sources = loadSourcesFromPrefs()
             musicSources.postValue(sources)
             
             if (sources.isEmpty()) {
@@ -87,29 +84,86 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             url = "http://your-nas-ip:port/music",
             enabled = true
         )
-        database.musicSourceDao().insertSource(defaultSource)
+        saveSourcesToPrefs(listOf(defaultSource))
         loadMusicSources()
     }
 
     fun addMusicSource(config: MusicSourceConfig) {
         viewModelScope.launch {
-            database.musicSourceDao().insertSource(config.copy(id = UUID.randomUUID().toString()))
+            val currentSources = loadSourcesFromPrefs().toMutableList()
+            currentSources.add(config.copy(id = UUID.randomUUID().toString()))
+            saveSourcesToPrefs(currentSources)
             loadMusicSources()
         }
     }
 
     fun updateMusicSource(config: MusicSourceConfig) {
         viewModelScope.launch {
-            database.musicSourceDao().updateSource(config)
+            val currentSources = loadSourcesFromPrefs().toMutableList()
+            val index = currentSources.indexOfFirst { it.id == config.id }
+            if (index != -1) {
+                currentSources[index] = config
+            }
+            saveSourcesToPrefs(currentSources)
             loadMusicSources()
         }
     }
 
     fun deleteMusicSource(id: String) {
         viewModelScope.launch {
-            database.musicSourceDao().deleteSource(id)
+            val currentSources = loadSourcesFromPrefs().toMutableList()
+            currentSources.removeAll { it.id == id }
+            saveSourcesToPrefs(currentSources)
             loadMusicSources()
         }
+    }
+
+    private fun loadSourcesFromPrefs(): List<MusicSourceConfig> {
+        val json = sharedPrefs.getString("music_sources", "[]") ?: "[]"
+        return try {
+            val sources = mutableListOf<MusicSourceConfig>()
+            if (json != "[]") {
+                val items = json.drop(1).dropLast(1).split("},{")
+                for (item in items) {
+                    val parts = item.split("\"")
+                    var id = ""
+                    var name = ""
+                    var type = MusicSourceType.NAS_HTTP
+                    var url = ""
+                    var username = ""
+                    var password = ""
+                    var enabled = true
+                    
+                    var i = 0
+                    while (i < parts.size) {
+                        if (parts[i] == "id") id = parts[i + 2]
+                        if (parts[i] == "name") name = parts[i + 2]
+                        if (parts[i] == "type") type = when (parts[i + 2]) {
+                            "SUBSONIC" -> MusicSourceType.SUBSONIC
+                            else -> MusicSourceType.NAS_HTTP
+                        }
+                        if (parts[i] == "url") url = parts[i + 2]
+                        if (parts[i] == "username") username = parts[i + 2]
+                        if (parts[i] == "password") password = parts[i + 2]
+                        if (parts[i] == "enabled") enabled = parts[i + 2] == "true"
+                        i++
+                    }
+                    if (id.isNotEmpty()) {
+                        sources.add(MusicSourceConfig(id, name, type, url, username, password, enabled))
+                    }
+                }
+            }
+            sources
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveSourcesToPrefs(sources: List<MusicSourceConfig>) {
+        val json = sources.joinToString(",", "[", "]") { 
+            """{"id":"${it.id}","name":"${it.name}","type":"${it.type}","url":"${it.url}","username":"${it.username}","password":"${it.password}","enabled":${it.enabled}}"""
+        }
+        sharedPrefs.edit().putString("music_sources", json).apply()
     }
 
     fun fetchMusic() {
@@ -118,7 +172,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             errorMessage.postValue(null)
             
             try {
-                val enabledSources = database.musicSourceDao().getEnabledSources()
+                val enabledSources = loadSourcesFromPrefs().filter { it.enabled }
                 val allSongs = mutableListOf<Song>()
                 val allAlbums = mutableListOf<Album>()
                 
