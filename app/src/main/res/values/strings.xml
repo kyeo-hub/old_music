@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">老歌播放器</string>
+    <string name="home">首页</string>
+    <string name="library">音乐库</string>
+    <string name="search">搜索</string>
+    <string name="settings">设置</string>
+    <string name="play">播放</string>
+    <string name="pause">暂停</string>
+    <string name="next">下一首</string>
+    <string name="previous">上一首</string>
+    <string name="shuffle">随机播放</string>
+    <string name="repeat">循环</string>
+    <string name="add_to_queue">添加到队列</string>
+    <string name="now_playing">正在播放</string>
+    <string name="no_songs">暂无歌曲</string>
+    <string name="loading">加载中...</string>
+    <string name="music_source">音乐源</string>
+    <string name="nas_server">NAS服务器</string>
+    <string name="server_url">服务器地址</string>
+    <string name="username">用户名</string>
+    <string name="password">密码</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="clear_queue">清空队列</string>
+    <string name="queue">播放队列</string>
+</resources>
