@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -38,6 +39,9 @@ fun SettingsScreen(
     onDeleteSource: (String) -> Unit,
     onBack: () -> Unit
 ) {
+    var showAddDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf<MusicSourceConfig?>(null) }
+    
     Column(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -55,7 +59,7 @@ fun SettingsScreen(
             items(sources) { source ->
                 SourceItem(
                     source = source,
-                    onEdit = { showEditDialog(source, onUpdateSource) },
+                    onEdit = { showEditDialog = source },
                     onDelete = { onDeleteSource(source.id) },
                     onToggle = {
                         onUpdateSource(source.copy(enabled = !source.enabled))
@@ -68,10 +72,31 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            onClick = { showAddDialog(onAddSource) }
+            onClick = { showAddDialog = true }
         ) {
             Text(text = "添加音乐源")
         }
+    }
+    
+    if (showAddDialog) {
+        AddSourceDialog(
+            onDismiss = { showAddDialog = false },
+            onSave = { source ->
+                onAddSource(source)
+                showAddDialog = false
+            }
+        )
+    }
+    
+    showEditDialog?.let { source ->
+        EditSourceDialog(
+            source = source,
+            onDismiss = { showEditDialog = null },
+            onSave = { updatedSource ->
+                onUpdateSource(updatedSource)
+                showEditDialog = null
+            }
+        )
     }
 }
 
@@ -143,141 +168,140 @@ fun SourceItem(
 }
 
 @Composable
-fun showAddDialog(onAdd: (MusicSourceConfig) -> Unit) {
-    var showDialog by remember { mutableStateOf(true) }
+fun AddSourceDialog(
+    onDismiss: () -> Unit,
+    onSave: (MusicSourceConfig) -> Unit
+) {
     var name by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var sourceType by remember { mutableStateOf(MusicSourceType.SUBSONIC) }
 
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text(text = "添加音乐源") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("名称") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = url,
-                        onValueChange = { url = it },
-                        label = { Text("服务器地址") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("用户名（可选）") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("密码（可选）") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (name.isNotEmpty() && url.isNotEmpty()) {
-                            onAdd(
-                                MusicSourceConfig(
-                                    id = "",
-                                    name = name,
-                                    type = sourceType,
-                                    url = url,
-                                    username = username,
-                                    password = password,
-                                    enabled = true
-                                )
-                            )
-                            showDialog = false
-                        }
-                    }
-                ) {
-                    Text("保存")
-                }
-            },
-            dismissButton = {
-                Button(onClick = { showDialog = false }) {
-                    Text("取消")
-                }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "添加音乐源") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("名称") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("服务器地址") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("用户名（可选）") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("密码（可选）") },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-        )
-    }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isNotEmpty() && url.isNotEmpty()) {
+                        onSave(
+                            MusicSourceConfig(
+                                id = "",
+                                name = name,
+                                type = sourceType,
+                                url = url,
+                                username = username,
+                                password = password,
+                                enabled = true
+                            )
+                        )
+                    }
+                }
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 
 @Composable
-fun showEditDialog(source: MusicSourceConfig, onUpdate: (MusicSourceConfig) -> Unit) {
-    var showDialog by remember { mutableStateOf(true) }
+fun EditSourceDialog(
+    source: MusicSourceConfig,
+    onDismiss: () -> Unit,
+    onSave: (MusicSourceConfig) -> Unit
+) {
     var name by remember { mutableStateOf(source.name) }
     var url by remember { mutableStateOf(source.url) }
     var username by remember { mutableStateOf(source.username) }
     var password by remember { mutableStateOf(source.password) }
 
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text(text = "编辑音乐源") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("名称") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = url,
-                        onValueChange = { url = it },
-                        label = { Text("服务器地址") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("用户名") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("密码") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (name.isNotEmpty() && url.isNotEmpty()) {
-                            onUpdate(
-                                source.copy(
-                                    name = name,
-                                    url = url,
-                                    username = username,
-                                    password = password
-                                )
-                            )
-                            showDialog = false
-                        }
-                    }
-                ) {
-                    Text("保存")
-                }
-            },
-            dismissButton = {
-                Button(onClick = { showDialog = false }) {
-                    Text("取消")
-                }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "编辑音乐源") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("名称") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("服务器地址") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("用户名") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("密码") },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-        )
-    }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isNotEmpty() && url.isNotEmpty()) {
+                        onSave(
+                            source.copy(
+                                name = name,
+                                url = url,
+                                username = username,
+                                password = password
+                            )
+                        )
+                    }
+                }
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }

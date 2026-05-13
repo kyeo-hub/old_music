@@ -220,6 +220,7 @@ fun PlayerControls(
                         RepeatMode.OFF -> androidx.compose.material.icons.Icons.Default.Repeat
                         RepeatMode.ONE -> androidx.compose.material.icons.Icons.Default.RepeatOne
                         RepeatMode.ALL -> androidx.compose.material.icons.Icons.Default.Repeat
+                        else -> androidx.compose.material.icons.Icons.Default.Repeat
                     }
                     androidx.compose.material3.Icon(
                         imageVector = icon,
